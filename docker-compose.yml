@@ -10,7 +10,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ../blog-post-backend/data:/var/lib/postgresql/data
+      - ../backend/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -27,7 +27,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - ../auth/database/data:/var/lib/postgresql/data
+      - ../auth-service/database/data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -46,30 +46,45 @@ services:
   
   auth:
     build: 
-      context: ../auth
+      context: ../auth-service
     container_name: auth
     ports:
-      - "5000:5000"
+      - "4000:4000"
     depends_on:
       auth-db: 
         condition: service_healthy
       redis:
         condition: service_healthy
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_HOST=auth-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+      - PORT=4000
+      - HASH=supersecret
   server:
     build: 
-      context: ../blog-post-backend
+      context: ../backend
     container_name: server
     ports:
-      - "8080:8080"
+      - "3000:3000"
     # healthcheck:
     #   test: ["CMD", "curl", "-f", "http://localhost:8080/blog-posts"]
     #   interval: 10s
     #   timeout: 5s
     #   retries: 5
     environment:
+      - DB_HOST=db
+      - DB_PORT=5432
       - DB_USER=postgres
-      - DB_PASS=postgres
-      - POSTGRESQL_DB_NAME=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+      - PORT=3000
+      - AUTH_URL=auth
+      - AUTH_PORT=4000
 
     depends_on:
       db: 
@@ -85,21 +100,32 @@ services:
 
   migration-backend:
     build: 
-      context: ../blog-post-backend
+      context: ../backend
       dockerfile: Dockerfile.migration
     container_name: migration-backend
     depends_on:
       db: 
         condition: service_healthy
     environment:
-      - NODE_ENV=docker 
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
+    
   migration-auth:
     build: 
-      context: ../auth
+      context: ../auth-service
       dockerfile: Dockerfile.migration
     container_name: migration-auth
     depends_on:
       auth-db: 
         condition: service_healthy
+    environment:
+      - DB_HOST=auth-db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_NAME=postgres
     
     
